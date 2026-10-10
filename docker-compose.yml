@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  url-scanner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: url-scanner
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - DATABASE_URL=sqlite:///./data/scanner.db
+      - HOST=0.0.0.0
+      - PORT=8000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: cron service for blacklist updates
+  blacklist-updater:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: url-scanner-updater
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    entrypoint: ["python", "scripts/update_blacklist.py"]
+    environment:
+      - DATABASE_URL=sqlite:///./data/scanner.db
+    restart: on-failure
+    profiles:
+      - updater
